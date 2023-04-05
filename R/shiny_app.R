@@ -5,7 +5,7 @@
 
 ## Setup libraries and seed ----
 require('igraph')
-library('shiny')
+require('shiny')
 require('shinythemes')
 require('shinyWidgets')
 require('RColorBrewer')
@@ -41,7 +41,7 @@ if(!file.exists("seed.txt")) {
 ## Create Fluid Page ----
 #App start page, start of fluid page, creation of initial output
 myApp <- function() {
-ui <- fluidPage(
+ui <- shiny::fluidPage(
   theme = shinytheme("flatly"),
   div(style = "padding: 1px 0px; width: '100%'",
       titlePanel(
