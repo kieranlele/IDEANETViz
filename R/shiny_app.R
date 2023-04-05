@@ -40,7 +40,7 @@ if(!file.exists("seed.txt")) {
 
 ## Create Fluid Page ----
 #App start page, start of fluid page, creation of initial output
-myApp <- function() {
+ideanet_viz <- function() {
 ui <- shiny::fluidPage(
   theme = shinytheme("flatly"),
   div(style = "padding: 1px 0px; width: '100%'",
