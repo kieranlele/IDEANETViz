@@ -5,7 +5,7 @@
 
 ## Setup libraries and seed ----
 require('igraph')
-require('shiny')
+library('shiny')
 require('shinythemes')
 require('shinyWidgets')
 require('RColorBrewer')
