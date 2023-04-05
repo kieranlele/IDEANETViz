@@ -40,9 +40,8 @@ if(!file.exists("seed.txt")) {
 
 ## Create Fluid Page ----
 #App start page, start of fluid page, creation of initial output
-ideanet_viz <- function() {
 ui <- shiny::fluidPage(
-  theme = shinytheme::shinytheme("flatly"),
+  theme = shinythemes::shinytheme("flatly"),
   div(style = "padding: 1px 0px; width: '100%'",
       titlePanel(
         title = "",
@@ -1044,4 +1043,3 @@ net5 <- reactive({
 
 
 shinyApp(ui, server)
-}
