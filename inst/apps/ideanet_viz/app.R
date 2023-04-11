@@ -18,18 +18,9 @@ require('rlang')
 require('foreach')
 require('ideanet')
 require('DT')
-# source(paste0(dirname(getwd()), '/ideanet','/kieran_debug','/netwrite copy.R'))
-# source(paste0(dirname(getwd()), '/ideanet','/R','/network_level_measures.R'))
-# source(paste0(dirname(getwd()), '/ideanet','/R','/net_splitter.R'))
-# source(paste0(dirname(getwd()), '/ideanet','/R','/node_level_measures.R'))
-#options(max.print = 10000)
+
 
 rm(list=ls())
-
-#source(file = "simpler_netwrite.r")
-#source(file = "community_detection_tw.R")
-#source(file = paste0(dirname(getwd()),'/DyadAnalysis_Utilities/qap_setup.R'))
-#source(file = paste0(dirname(getwd()), "/role_analysis/role_analysis_parent.R"))
 
 #check if seed file exists,and if it does not, create
 if(!file.exists("seed.txt")) {
@@ -421,7 +412,7 @@ nodelist3 <- reactive({
   net <- net0()
   nodes <- nodelist2()
   print(nodes)
-  communities(net, shiny  = TRUE)
+  ideanet::communities(net, shiny  = TRUE)
   comm_members_net$id <- as.double(comm_members_net$id)
   comm_members_net <- comm_members_net %>% 
     mutate_all(~replace(., is.na(.), 0))
@@ -967,7 +958,7 @@ net5 <- reactive({
   })
   
   observeEvent(input$run_role_detect, {
-    role_analysis(init_net, # igraph object generated from netwrite
+    ideanet::role_analysis(init_net, # igraph object generated from netwrite
                                                 # Or list of igraph objects
                                                 nodes = node_measures, # node-level measures generated from netwrite
                                                 # Or list of node information
