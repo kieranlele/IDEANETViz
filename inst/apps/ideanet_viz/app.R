@@ -341,6 +341,7 @@ net0 <- reactive({
                                  directed=input$direction_toggle,
                                  net_name='init_net',
                                  shiny=TRUE)
+      print(typeof(init_net))
       init_net
     } else {
       netwrite(data_type = c('edgelist'), adjacency_matrix=FALSE, 
@@ -352,6 +353,7 @@ net0 <- reactive({
                                  missing_code=99999, weight_type='frequency', 
                                  directed=input$direction_toggle,
                                  net_name='init_net',shiny=TRUE)
+      print(typeof(init_net))
       init_net
     }
   } else {
@@ -364,6 +366,7 @@ net0 <- reactive({
                                missing_code=99999, weight_type='frequency', 
                                directed=input$direction_toggle,
                                net_name='init_net',shiny=TRUE)
+    print(typeof(init_net))
     init_net
   }
 })
@@ -385,7 +388,6 @@ node_data2 <- reactive({
       node_data2 <- node_data()
       node_data2$attr <- node_data2[,input$node_id_col]
       node_data2
-      print(node_data2)
     } else {
       NULL
     } 
@@ -396,10 +398,10 @@ nodelist2 <- reactive({
   if (!is.null(node_data2())) {
     node_data3 <- node_data2()
     node_data3[,input$node_id_col] <- as.character(node_data3[,input$node_id_col])
+    node_measures <- node_measures %>% mutate(id = as.character(id))
     node_measures <- node_measures %>%
       left_join(node_data3)
     node_measures
-    print(node_measures)
   } else {
     node_measures
   }  
@@ -412,9 +414,7 @@ nodelist3 <- reactive({
   )
   net <- net0()
   nodes <- nodelist2()
-  print(nodes)
   ideanet::communities(net, shiny  = TRUE)
-  comm_members_net$id <- as.double(comm_members_net$id)
   comm_members_net <- comm_members_net %>% 
     mutate_all(~replace(., is.na(.), 0))
   nodes <- nodes %>%
@@ -424,7 +424,6 @@ nodelist3 <- reactive({
       left_join(cluster_assignments %>% select('best_fit','id'), by = "id")
   }
   nodes
-  print(nodes)
 })
 
 #Add labels in network 1
@@ -433,8 +432,9 @@ net1 <- reactive({
   # Adding Vector Labels
   if (isTruthy(input$node_label_col)) {
     if (!(is.null(input$node_label_col))) {
-      V(net)$label <- nodelist3()$attr
+      V(net)$label <- nodelist3()$id
     } else {
+      print(nodelist3()[,input$node_label_col])
       V(net)$label <- nodelist3()[,input$node_label_col]
     }
   } else {
@@ -480,7 +480,7 @@ net2 <- reactive({
       V(net)$size <- rep(10, length(V(net)$label)) * input$node_scalar_value
     }
   } else if (input$node_size_method == "Degree") {
-    V(net)$size <- rescale2(degree(net, mode="all"), min(degree(net, mode="all")), max(degree(net, mode="all")), 3,17) * input$node_scalar_value
+    V(net)$size <- rescale2(igraph::degree(net, mode = "all"), min(igraph::degree(net, mode= "all")), max(igraph::degree(net, mode= "all")), 3,17) * input$node_scalar_value
   } else if (input$node_size_method == "Eigen Centrality") {
     V(net)$size <- rescale2(eigen_centrality(net)$vector, min(eigen_centrality(net)$vector), max(eigen_centrality(net)$vector), 3,17) * input$node_scalar_value
   } else if (input$node_size_method == "Betweenness Centrality") {
@@ -621,7 +621,8 @@ net7 <- reactive({
 net4 <- reactive({
   if (input$isolate_toggle == TRUE) {
     net <- net7()
-    bad.vs<-V(net)[degree(net) == 0]
+    print(typeof(net))
+    bad.vs<-V(net)[igraph::degree(net) == 0]
     net <- igraph::delete.vertices(net, bad.vs)
     net
   } else {
@@ -858,6 +859,7 @@ net5 <- reactive({
     print(chosen_var())
   })
   
+  #run options
   
   output$run_QAP_setup <- 
     renderUI({
@@ -878,8 +880,8 @@ net5 <- reactive({
     foreach(i=1:length(chosen_var())) %do% {
       net <- set_vertex_attr(net,chosen_var()[i],value=nodelist3() %>% pull(parse_expr(chosen_var()[i])))
     }
-    ran_toggle_qap$x <- 1
     qap_setup(net,chosen_var(),chosen_methods())
+    ran_toggle_qap$x <- 1
   })
   
   #Run QAP MODEL
