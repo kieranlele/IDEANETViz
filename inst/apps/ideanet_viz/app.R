@@ -132,7 +132,9 @@ ui <- shiny::fluidPage(
 ### Visualize network and user options ---- 
     tabPanel(
       "Visualize",
+      sidebarLayout(
       sidebarPanel(
+        style = "height: 90vh; overflow-y: auto;",
         uiOutput("set_seed"),
         br(),
         uiOutput("save_image"),
@@ -156,7 +158,8 @@ ui <- shiny::fluidPage(
       mainPanel(
         uiOutput("network_ui")
       )
-    ),
+    )),
+### Network Metrics ----
     tabPanel(
       "Network Metrics",
       sidebarPanel(
@@ -170,7 +173,14 @@ ui <- shiny::fluidPage(
 ### Networks DataTable ----
 tabPanel(
   "Network Statistics",
-  mainPanel(DTOutput('statistics_table'))
+  sidebarLayout(
+    sidebarPanel(
+      style = "height: 90vh; overflow-y: auto;",
+      checkboxGroupInput("show_vars", "Columns in diamonds to show:",
+                         names(node_measures), selected = names(node_measures)[1:5])
+      ),
+      mainPanel(DTOutput('statistics_table'))
+    )
 ),
 ### Analysis tab ----
     tabPanel(
@@ -341,7 +351,6 @@ net0 <- reactive({
                                  directed=input$direction_toggle,
                                  net_name='init_net',
                                  shiny=TRUE)
-      print(typeof(init_net))
       init_net
     } else {
       netwrite(data_type = c('edgelist'), adjacency_matrix=FALSE, 
@@ -374,13 +383,10 @@ net0 <- reactive({
 #### Create datable vis for network statistics ----
   
   
-#### Add vertex attributes ----
+#### Add node attributes ----
 
 # Joining all node_data to ideanet to preserve ordering
 
-### Statistics table ----
-  output$statistics_table <- renderDT(node_measures)
-  
   
 ### MAKE SURE TO ADD CHECK FOR PROCESSING BACK IN!!!!
 node_data2 <- reactive({
@@ -787,6 +793,9 @@ net5 <- reactive({
     }
   })
 
+### Visualize nodemeasures ----
+  
+output$statistics_table <- renderDataTable(node_measures[, input$show_vars, drop = FALSE])
 ### Setup Analysis Tab ----
   output$analysis_chooser <- renderUI({
     selectInput(inputId = "analysis_chooser", label = "Choose Measures Output", choices = c("QAP", "Role Detection"), selected = "QAP", multiple = FALSE)
