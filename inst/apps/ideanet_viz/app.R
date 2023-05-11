@@ -176,8 +176,7 @@ tabPanel(
   sidebarLayout(
     sidebarPanel(
       style = "height: 90vh; overflow-y: auto;",
-      checkboxGroupInput("show_vars", "Columns in diamonds to show:",
-                         names(node_measures), selected = names(node_measures)[1:5])
+      uiOutput('show_vars')
       ),
       mainPanel(DTOutput('statistics_table'))
     )
@@ -341,17 +340,18 @@ net0 <- reactive({
   if (!is.null(input$raw_nodes) & isTruthy(input$node_id_col))  {
     if (input$node_id_col != "Empty") {
       netwrite(data_type = c('edgelist'), adjacency_matrix=FALSE, 
-                                 adjacency_list=FALSE, node_id=input$node_id_col,
-                                 nodelist=node_data(),
-                                 i_elements=edge_data()[,input$edge_in_col], 
-                                 j_elements=edge_data()[,input$edge_out_col], 
-                                 weights=initial_edge(), 
-                                 type=type_ret, package='igraph', 
-                                 missing_code=99999, weight_type='frequency', 
-                                 directed=input$direction_toggle,
-                                 net_name='init_net',
-                                 shiny=TRUE)
+                                adjacency_list=FALSE, nodelist=node_data(),
+                                node_id=input$node_id_col,
+                                i_elements=edge_data()[,input$edge_in_col], 
+                                j_elements=edge_data()[,input$edge_out_col], 
+                                weights=initial_edge(), 
+                                type=type_ret, package='igraph', 
+                                missing_code=99999, weight_type='frequency', 
+                                directed=input$direction_toggle,
+                                net_name='init_net',
+                                shiny=TRUE)
       init_net
+      
     } else {
       netwrite(data_type = c('edgelist'), adjacency_matrix=FALSE, 
                                  adjacency_list=FALSE,
@@ -362,7 +362,6 @@ net0 <- reactive({
                                  missing_code=99999, weight_type='frequency', 
                                  directed=input$direction_toggle,
                                  net_name='init_net',shiny=TRUE)
-      print(typeof(init_net))
       init_net
     }
   } else {
@@ -375,14 +374,10 @@ net0 <- reactive({
                                missing_code=99999, weight_type='frequency', 
                                directed=input$direction_toggle,
                                net_name='init_net',shiny=TRUE)
-    print(typeof(init_net))
     init_net
   }
 })
 
-#### Create datable vis for network statistics ----
-  
-  
 #### Add node attributes ----
 
 # Joining all node_data to ideanet to preserve ordering
@@ -418,11 +413,15 @@ nodelist3 <- reactive({
   validate(
     need(input$raw_edges, 'Upload Edge Data!'),
   )
+  
   net <- net0()
   nodes <- nodelist2()
+  print('started_com')
   ideanet::communities(net, shiny  = TRUE)
+  print('finished comm')
   comm_members_net <- comm_members_net %>% 
     mutate_all(~replace(., is.na(.), 0))
+  comm_members_net$id <- as.character(comm_members_net$id)
   nodes <- nodes %>%
       left_join(comm_members_net, by = "id")
   if (ran_toggle_qap$x==1) {
@@ -440,7 +439,6 @@ net1 <- reactive({
     if (!(is.null(input$node_label_col))) {
       V(net)$label <- nodelist3()$id
     } else {
-      print(nodelist3()[,input$node_label_col])
       V(net)$label <- nodelist3()[,input$node_label_col]
     }
   } else {
@@ -627,7 +625,6 @@ net7 <- reactive({
 net4 <- reactive({
   if (input$isolate_toggle == TRUE) {
     net <- net7()
-    print(typeof(net))
     bad.vs<-V(net)[igraph::degree(net) == 0]
     net <- igraph::delete.vertices(net, bad.vs)
     net
@@ -794,7 +791,11 @@ net5 <- reactive({
   })
 
 ### Visualize nodemeasures ----
-  
+output$show_vars <- renderUI({
+  validate(need(exists(node_measures),'Run IDEANet'))
+  checkboxGroupInput("show_vars", "Columns in node variables to show:",
+                     names(node_measures), selected = names(node_measures)[1:5])
+})
 output$statistics_table <- renderDataTable(node_measures[, input$show_vars, drop = FALSE])
 ### Setup Analysis Tab ----
   output$analysis_chooser <- renderUI({
