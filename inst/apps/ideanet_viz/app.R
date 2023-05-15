@@ -975,8 +975,8 @@ output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop =
   role_detect_choices <- reactive({
     choices_yah <- c()
     if (input$select_role_type == 'cluster') {
-      choices_yah <- c('cluster_dendogram',
-                       'cluster_modularity',
+      choices_yah <- c('cluster_modularity',
+                       'cluster_dendogram',
                        'cluster_relations_heatmaps_chisq',
                        'cluster_relations_heatmaps_density_centered',
                        'cluster_relations_heatmaps_density_std',
@@ -1000,7 +1000,7 @@ output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop =
   output$role_viz <- renderPlot({
     validate(
       need(input$raw_edges, 'Upload Edge Data!'),
-      need(ran_toggle_role_detect$x != 1, "Input Role Detection Parameters and Run!")
+      need(ran_toggle_role_detect$x == 1, "Input Role Detection Parameters and Run!")
     )
     if(input$select_role_viz == "cluster_modularity") {
       replayPlot(cluster_modularity)
@@ -1027,7 +1027,7 @@ output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop =
       plot(cluster_relations_heatmaps$density_centered) 
     }
     else if(input$select_role_viz == 'cluster_summaries_cent') {
-      plot(cluster_summaries_cent) 
+      plot(cluster_summaries_cent$summary_graph) 
     }
     else if(input$select_role_viz == 'cluster_summaries_triad') {
       plot(cluster_summaries_triad$summary_graph)
@@ -1068,11 +1068,6 @@ output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop =
   })
   
   observeEvent(input$run_role_detect, {
-    print(input$direction_toggle)
-    print(input$select_role_type)
-    print(input$role_det_min)
-    print(input$role_det_max)
-    print(input$min_cluster_size)
     ideanet::role_analysis(init_net, 
                           nodes = node_measures, 
                           directed = input$direction_toggle, 
@@ -1081,6 +1076,7 @@ output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop =
                           max_partitions = input$role_det_max, 
                           min_partition_size = as.integer(input$min_cluster_size), 
                           viz = TRUE)
+    ran_toggle_role_detect$x <- 1
   })
   
   
