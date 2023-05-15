@@ -237,8 +237,28 @@ server <- function(input, output, session) {
 ### Upload Node  and Edge Data ----
   
   #Upload Node Data
+  
+  
+  output$select_role_type <- renderUI({
+    selectInput('select_file_type_nodes', label = "Choose file type", choices = c('csv','excel','igraph','network','sna','pajek','ucinet'))
+  })
+  
   node_data <- reactive({
     req(input$raw_nodes)
+    # netread(
+    #   path = input$raw_nodes$datapath,
+    #   filetype = NULL,
+    #   sheet = NULL,
+    #   nodelist,
+    #   node_sheet = NULL,
+    #   object = NULL,
+    #   col_names = TRUE,
+    #   row_names = input$node_header),
+    #   format = NULL,
+    #   net_name = "network",
+    #   missing_code = 99999
+    # )
+    # network_nodelist
     read.csv(input$raw_nodes$datapath, header = input$node_header)
     #read.csv("test_nodes.csv", header = input$edge_header)
   })
@@ -254,6 +274,7 @@ server <- function(input, output, session) {
   #Upload Edge Data
   edge_data <- reactive({
     req(input$raw_edges)
+    #network_edgelist
     read.csv(input$raw_edges$datapath, header = input$edge_header)
     #read.csv("test_edges.csv", header = input$edge_header)
   })
@@ -792,17 +813,16 @@ net5 <- reactive({
 
 ### Visualize nodemeasures ----
 output$show_vars <- renderUI({
-  validate(need(exists(node_measures),'Run IDEANet'))
   checkboxGroupInput("show_vars", "Columns in node variables to show:",
                      names(node_measures), selected = names(node_measures)[1:5])
 })
-output$statistics_table <- renderDataTable(node_measures[, input$show_vars, drop = FALSE])
+output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop = FALSE])
 ### Setup Analysis Tab ----
   output$analysis_chooser <- renderUI({
     selectInput(inputId = "analysis_chooser", label = "Choose Measures Output", choices = c("QAP", "Role Detection"), selected = "QAP", multiple = FALSE)
   })
   
-#### Setup QAP ----
+#### QAP ----
 
   #CHOOSE METHODS
   output$method_chooser <- renderUI({
@@ -927,7 +947,7 @@ output$statistics_table <- renderDataTable(node_measures[, input$show_vars, drop
   
 
   
-#### Setup Role Detection ----
+#### Role Detection ----
 
   ran_toggle_role_detect <- reactiveValues(x=0)
   
@@ -958,7 +978,7 @@ output$statistics_table <- renderDataTable(node_measures[, input$show_vars, drop
       choices_yah <- c('cluster_dendogram',
                        'cluster_modularity',
                        'cluster_relations_heatmaps_chisq',
-                       'cluster_relations_heatmaps_densit_centered',
+                       'cluster_relations_heatmaps_density_centered',
                        'cluster_relations_heatmaps_density_std',
                        'cluster_relations_heatmaps_density',
                        'cluster_relations_sociogram',
@@ -991,6 +1011,9 @@ output$statistics_table <- renderDataTable(node_measures[, input$show_vars, drop
     else if(input$select_role_viz == 'cluster_relations_sociogram') {
       replayPlot(cluster_relations_sociogram$summary_graph) 
     }
+    else if(input$select_role_viz == 'cluster_sociogram') {
+      replayPlot(cluster_sociogram) 
+    }
     else if(input$select_role_viz == 'cluster_relations_heatmaps_chisq') {
       plot(cluster_relations_heatmaps$chisq) 
     }
@@ -1016,7 +1039,10 @@ output$statistics_table <- renderDataTable(node_measures[, input$show_vars, drop
       replayPlot(concor_modularity) 
     }
     else if(input$select_role_viz == 'concor_relations_sociogram') {
-      replayPlot(concor_relations_sociogram) 
+      replayPlot(concor_relations_sociogram$summary_graph) 
+    }
+    else if(input$select_role_viz == 'concor_sociogram') {
+      replayPlot(concor_sociogram) 
     }
     else if(input$select_role_viz == 'concor_relations_heatmaps_chisq') {
       plot(concor_relations_heatmaps$chisq) 
@@ -1038,39 +1064,23 @@ output$statistics_table <- renderDataTable(node_measures[, input$show_vars, drop
     })
   
   output$min_cluster_size <- renderUI({
-    selectInput(inputId = "min_cluster_size", label = "Choose Minimum Cluster Size", choices = append("",c(1:8)), selected = NULL)
+    selectInput(inputId = "min_cluster_size", label = "Choose Minimum Cluster Size", choices = append(NA,c(1:8)), selected = NA)
   })
   
   observeEvent(input$run_role_detect, {
-    ideanet::role_analysis(init_net, # igraph object generated from netwrite
-                                                # Or list of igraph objects
-                                                nodes = node_measures, # node-level measures generated from netwrite
-                                                # Or list of node information
-                                                directed = input$direction_toggle, # whether or not network is directed
-                                                method = input$select_role_type, # method of role inference/assignment (more options later)
-                                                min_partitions = input$role_det_min, # minimum number of clusters to test
-                                                max_partitions = input$role_det_max, # maximum number of clusters to test
-                                                min_partition_size = NA, # minimum number of nodes required for a cluster to exist
-                                                # If a numeric value is specified, this program uses the `cluster_collapse` function
-                                                # to try and aggregate smaller clusters into larger ones based on their parent brances
-                                                # in the dendrogram
-                                                backbone = .9, # When calculating optimal modularity, it helps to backbone the similarity/correlation
-                                                # matrix according to the nth percentile. How much you backbone tends to vary depending on the size of
-                                                # the network, which larger nets requiring higher thresholds.
-                                                viz = TRUE, # Produce summary visualizations
-                                                
-                                                # Arguments Specific to Clustering Method
-                                                fast_triad = TRUE, # Whether to use dplyr method for triad position counting
-                                                retain_variables = FALSE, # Export a dataframe of variables used in clustering
-                                                cluster_summaries = TRUE, # Export a dataframe containing mean values of clustering variables within each cluster
-                                                
-                                                # Arguments Specific to CONCOR 
-                                                self_ties = FALSE, # Whether to include self-ties in CONCOR calculation
-                                                cutoff = .999, # Correlation cutoff for detecting convergence in CONCOR
-                                                max_iter = 50 # Maximum number of iteration for CONCOR algorithm
-                                                
-                                                
-    )
+    print(input$direction_toggle)
+    print(input$select_role_type)
+    print(input$role_det_min)
+    print(input$role_det_max)
+    print(input$min_cluster_size)
+    ideanet::role_analysis(init_net, 
+                          nodes = node_measures, 
+                          directed = input$direction_toggle, 
+                          method = input$select_role_type, 
+                          min_partitions = input$role_det_min, 
+                          max_partitions = input$role_det_max, 
+                          min_partition_size = as.integer(input$min_cluster_size), 
+                          viz = TRUE)
   })
   
   
