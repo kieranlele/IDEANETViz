@@ -28,6 +28,14 @@ if(!file.exists("seed.txt")) {
   writeLines("999", "seed.txt")
 }
 
+if(exists('network_edgelist')) {
+  rm('network_edgelist')
+}
+
+if(exists('network_nodelist')) {
+  rm('network_nodelist')
+}
+
 
 ## Create Fluid Page ----
 #App start page, start of fluid page, creation of initial output
@@ -49,38 +57,41 @@ ui <- shiny::fluidPage(
       tabsetPanel(
         type = "tabs",
         tabPanel(
-          "Node Data",
+          "Upload Files",
           sidebarPanel(
-            fileInput(
-              'raw_nodes', "Upload Node Data (CSV)", multiple = FALSE, 
-              accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"),
-              buttonLabel = "Browse...", placeholder = "No file selected"
-            ),
-            checkboxInput("node_header", tags$b("Does the file have a header?"), TRUE),
+            uiOutput('select_file_type_edges'),
+            uiOutput('edge_format'),
+            checkboxInput("edge_names", tags$b("Does the file have an first id column"), FALSE),
+            checkboxInput("edge_header", tags$b("Does the file have a header?"), FALSE),
             tags$p(span("Large datasets may take a few seconds to render.", style = "color:red")),
-            tags$p(HTML("<b>Upload</b> the optional node data. The application only accepts .csv files.")),
-            tags$p(HTML("<b>Continue</b> on to upload the edge list."))
-          ),
-          mainPanel(
-            dataTableOutput('node_raw_upload')
-          )
-        ),
-        #code to upload edge list data
-        tabPanel(
-          "Edge List",
-          sidebarPanel(
+            tags$p(HTML("<b>Continue</b> on to process the data before visualizing it.")),
             fileInput(
               'raw_edges', "Upload Edge Data (CSV)", multiple = FALSE, 
-              accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"),
               buttonLabel = "Browse...", placeholder = "No file selected"
             ),
-            checkboxInput("edge_header", tags$b("Does the file have a header?"), TRUE),
-            tags$p(span("Large datasets may take a few seconds to render.", style = "color:red")),
-            tags$p(HTML("<b>Upload</b> the required edge list. The application only accepts .csv files.")),
-            tags$p(HTML("<b>Continue</b> on to process the data before visualizing it."))
+            checkboxInput('nodes_exist', tags$b("Does the dataset have a nodelist?"),FALSE),
+            conditionalPanel(
+              condition = 'input.nodes_exist',
+              fileInput(
+                'raw_nodes', "Upload Node Data (CSV)", multiple = FALSE, 
+                buttonLabel = "Browse...", placeholder = "No file selected"
+              ),
+              tags$p(span("Large datasets may take a few seconds to render.", style = "color:red")))
+            
+            
           ),
           mainPanel(
-            dataTableOutput('edge_raw_upload')
+            tabsetPanel(
+              type = "tabs",
+              tabPanel(
+                "Edge Data",
+                dataTableOutput('edge_raw_upload')
+              ),
+              tabPanel(
+                "Node Data",
+                dataTableOutput('node_raw_upload')
+              )
+            )
           )
         )
       )
@@ -172,7 +183,7 @@ ui <- shiny::fluidPage(
 
 ### Networks DataTable ----
 tabPanel(
-  "Network Statistics",
+  "Network Table",
   sidebarLayout(
     sidebarPanel(
       style = "height: 90vh; overflow-y: auto;",
@@ -239,29 +250,45 @@ server <- function(input, output, session) {
   #Upload Node Data
   
   
-  output$select_role_type <- renderUI({
-    selectInput('select_file_type_nodes', label = "Choose file type", choices = c('csv','excel','igraph','network','sna','pajek','ucinet'))
+  output$select_file_type_edges <- renderUI({
+    selectInput('select_file_type_edges', label = "Choose file type", choices = c('csv','excel','igraph','network','sna','pajek','ucinet'))
   })
   
-  node_data <- reactive({
-    req(input$raw_nodes)
-    # netread(
-    #   path = input$raw_nodes$datapath,
-    #   filetype = NULL,
-    #   sheet = NULL,
-    #   nodelist,
-    #   node_sheet = NULL,
-    #   object = NULL,
-    #   col_names = TRUE,
-    #   row_names = input$node_header),
-    #   format = NULL,
-    #   net_name = "network",
-    #   missing_code = 99999
-    # )
-    # network_nodelist
-    read.csv(input$raw_nodes$datapath, header = input$node_header)
-    #read.csv("test_nodes.csv", header = input$edge_header)
+  output$edge_format <- renderUI({
+    selectInput('edge_format', label = "Choose edge format", choices = c('edgelist','adjacency_matrix','adjacency_list'))
   })
+  
+  
+  edge_data <- reactive({
+    if (input$nodes_exist & !is.null(input$raw_nodes) & !is.null(input$raw_edges)) {
+    netread(
+      path = input$raw_edges$datapath,
+      filetype = input$select_file_type_edges,
+      nodelist = input$raw_nodes$datapath,
+      col_names = input$edge_header,
+      row_names = input$edge_names,
+      format = input$edge_format,
+      net_name = "network",
+      missing_code = 99999
+    )
+    }
+    else if (!is.null(input$raw_edges)) {
+      print(input$edge_format)
+      netread(
+        path = input$raw_edges$datapath,
+        filetype = input$select_file_type_edges,
+        format = input$edge_format,
+        col_names = input$edge_header,
+        row_names = input$edge_names,
+        nodelist = NULL,
+        net_name = "network",
+        missing_code = 99999
+      )
+    }
+    network_edgelist
+  })
+  
+  node_data <- reactive(network_nodelist)
   
   #Display Node Data
   output$node_raw_upload <- renderDataTable({
@@ -271,13 +298,6 @@ server <- function(input, output, session) {
     node_data()
   })
   
-  #Upload Edge Data
-  edge_data <- reactive({
-    req(input$raw_edges)
-    #network_edgelist
-    read.csv(input$raw_edges$datapath, header = input$edge_header)
-    #read.csv("test_edges.csv", header = input$edge_header)
-  })
   
   #Display Edge Data
   output$edge_raw_upload <- renderDataTable({
