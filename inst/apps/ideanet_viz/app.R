@@ -62,18 +62,18 @@ ui <- shiny::fluidPage(
             uiOutput('select_file_type_edges'),
             uiOutput('edge_format'),
             checkboxInput("edge_names", tags$b("Does the file have an first id column"), FALSE),
-            checkboxInput("edge_header", tags$b("Does the file have a header?"), FALSE),
+            checkboxInput("edge_header", tags$b("Does the file have a header?"), TRUE),
             tags$p(span("Large datasets may take a few seconds to render.", style = "color:red")),
             tags$p(HTML("<b>Continue</b> on to process the data before visualizing it.")),
             fileInput(
-              'raw_edges', "Upload Edge Data (CSV)", multiple = FALSE, 
+              'raw_edges', "Upload Edge Data", multiple = FALSE, 
               buttonLabel = "Browse...", placeholder = "No file selected"
             ),
             checkboxInput('nodes_exist', tags$b("Does the dataset have a nodelist?"),FALSE),
             conditionalPanel(
               condition = 'input.nodes_exist',
               fileInput(
-                'raw_nodes', "Upload Node Data (CSV)", multiple = FALSE, 
+                'raw_nodes', "Upload Node Data", multiple = FALSE, 
                 buttonLabel = "Browse...", placeholder = "No file selected"
               ),
               tags$p(span("Large datasets may take a few seconds to render.", style = "color:red")))
@@ -251,7 +251,7 @@ server <- function(input, output, session) {
   
   
   output$select_file_type_edges <- renderUI({
-    selectInput('select_file_type_edges', label = "Choose file type", choices = c('csv','excel','igraph','network','sna','pajek','ucinet'))
+    selectInput('select_file_type_edges', label = "Choose file type", choices = c('csv'))
   })
   
   output$edge_format <- renderUI({
@@ -325,7 +325,7 @@ server <- function(input, output, session) {
   
   #Node Processing Options
   output$node_ids <- renderUI({
-    selectInput(inputId = "node_id_col", label = "Column with node ids*", choices = append("Empty",colnames(node_data())), selected = "N/A", multiple = FALSE)
+    selectInput(inputId = "node_id_col", label = "Column with node ids*", choices = append("Empty",colnames(node_data())), selected = "id", multiple = FALSE)
   })
   output$node_labels <- renderUI({
     selectInput(inputId = "node_label_col", label = "Column with node labels", choices = append("Empty",colnames(node_data())), selected = "N/A", multiple = FALSE)
@@ -439,8 +439,8 @@ node_data2 <- reactive({
 nodelist2 <- reactive({
   if (!is.null(node_data2())) {
     node_data3 <- node_data2()
-    node_data3[,input$node_id_col] <- as.character(node_data3[,input$node_id_col])
-    node_measures <- node_measures %>% mutate(id = as.character(id))
+    #node_data3[,input$node_id_col] <- as.character(node_data3[,input$node_id_col])
+    #node_measures <- node_measures %>% mutate(id = as.character(id))
     node_measures <- node_measures %>%
       left_join(node_data3)
     node_measures
@@ -457,12 +457,13 @@ nodelist3 <- reactive({
   
   net <- net0()
   nodes <- nodelist2()
-  print('started_com')
+  print(nodes)
+  print('started community detection')
   ideanet::communities(net, shiny  = TRUE)
-  print('finished comm')
+  print('finished community detection')
   comm_members_net <- comm_members_net %>% 
     mutate_all(~replace(., is.na(.), 0))
-  comm_members_net$id <- as.character(comm_members_net$id)
+  #comm_members_net$id <- as.character(comm_members_net$id)
   nodes <- nodes %>%
       left_join(comm_members_net, by = "id")
   if (ran_toggle_qap$x==1) {
