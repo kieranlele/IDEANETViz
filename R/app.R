@@ -5,8 +5,8 @@
 #'
 #' @export
 #'
-ideanet_viz <- function(name = "ideanet_viz", ...) {
-  appDir <- system.file(paste0("apps/", name), package = "IDEANETViz")
+ideanetViz <- function(name = "ideanetViz", ...) {
+  appDir <- system.file(paste0("apps/", name), package = "ideanetViz")
   if (appDir == "") stop("The shiny app ", name, " does not exist")
-  shiny::runApp(appDir, ...)
+  shiny::runApp(appDir, display.mode = 'showcase', ...)
 }
