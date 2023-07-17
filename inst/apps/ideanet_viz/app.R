@@ -1,8 +1,5 @@
 #Feb 12, 2022
 
-#TO-DO:Comment out initial files
-
-
 ## Setup libraries and seed ----
 require('igraph')
 require('shiny')
@@ -27,11 +24,11 @@ if(!file.exists("seed.txt")) {
   #read seed file o, create if not written
   writeLines("999", "seed.txt")
 }
-
+#remove existing edgelist if rerunning and in environment
 if(exists('network_edgelist')) {
   rm('network_edgelist')
 }
-
+#remove existing edgelist if rerunning and in environment
 if(exists('network_nodelist')) {
   rm('network_nodelist')
 }
@@ -85,10 +82,12 @@ ui <- shiny::fluidPage(
               type = "tabs",
               tabPanel(
                 "Edge Data",
+                style = "overflow-x: auto;",
                 dataTableOutput('edge_raw_upload')
               ),
               tabPanel(
                 "Node Data",
+                style = "overflow-x: auto;",
                 dataTableOutput('node_raw_upload')
               )
             )
@@ -114,6 +113,7 @@ ui <- shiny::fluidPage(
             tags$p(HTML("The <b>node</b> <b>ids</b> should reflect ids in the edge list. It's required to correctly link the node attributes.")),
           ),
           mainPanel(
+            style = "overflow-x: auto;",
             dataTableOutput('node_processed')
           )
         ),
@@ -135,6 +135,7 @@ ui <- shiny::fluidPage(
             tags$p(HTML("If the graph is undirected, the order of sender and alter id columns doesn't matter.")),
           ),
           mainPanel(
+            style = "overflow-x: auto;",
             dataTableOutput('edge_processed')
           )
         )
@@ -189,7 +190,9 @@ tabPanel(
       style = "height: 90vh; overflow-y: auto;",
       uiOutput('show_vars')
       ),
-      mainPanel(DTOutput('statistics_table'))
+      mainPanel(
+        style = "overflow-x: auto;",
+        DTOutput('statistics_table'))
     )
 ),
 ### Analysis tab ----
@@ -251,7 +254,7 @@ server <- function(input, output, session) {
   
   
   output$select_file_type_edges <- renderUI({
-    selectInput('select_file_type_edges', label = "Choose file type", choices = c('csv'))
+    selectInput('select_file_type_edges', label = "Choose file type", choices = c('csv', 'excel'))
   })
   
   output$edge_format <- renderUI({
@@ -273,7 +276,6 @@ server <- function(input, output, session) {
     )
     }
     else if (!is.null(input$raw_edges)) {
-      print(input$edge_format)
       netread(
         path = input$raw_edges$datapath,
         filetype = input$select_file_type_edges,
@@ -285,10 +287,13 @@ server <- function(input, output, session) {
         missing_code = 99999
       )
     }
-    network_edgelist
+    as.data.frame(network_edgelist)
   })
   
-  node_data <- reactive(network_nodelist)
+  node_data <- reactive({
+    path_edges = input$raw_edges$datapath
+    path_nodes = input$raw_nodes$datapath
+    as.data.frame(network_nodelist)})
   
   #Display Node Data
   output$node_raw_upload <- renderDataTable({
@@ -380,6 +385,7 @@ net0 <- reactive({
   }
   if (!is.null(input$raw_nodes) & isTruthy(input$node_id_col))  {
     if (input$node_id_col != "Empty") {
+      print('started netwrite 1')
       netwrite(data_type = c('edgelist'), adjacency_matrix=FALSE, 
                                 adjacency_list=FALSE, nodelist=node_data(),
                                 node_id=input$node_id_col,
@@ -391,9 +397,11 @@ net0 <- reactive({
                                 directed=input$direction_toggle,
                                 net_name='init_net',
                                 shiny=TRUE)
+      print('processed netwrite')
       init_net
       
     } else {
+      print('started netwrite 2')
       netwrite(data_type = c('edgelist'), adjacency_matrix=FALSE, 
                                  adjacency_list=FALSE,
                                  i_elements=edge_data()[,input$edge_in_col], 
@@ -403,9 +411,11 @@ net0 <- reactive({
                                  missing_code=99999, weight_type='frequency', 
                                  directed=input$direction_toggle,
                                  net_name='init_net',shiny=TRUE)
+      print('processed netwrite')
       init_net
     }
   } else {
+    print('started netwrite 3')
     netwrite(data_type = c('edgelist'), adjacency_matrix=FALSE, 
                                adjacency_list=FALSE,
                                i_elements=edge_data()[,input$edge_in_col], 
@@ -415,6 +425,7 @@ net0 <- reactive({
                                missing_code=99999, weight_type='frequency', 
                                directed=input$direction_toggle,
                                net_name='init_net',shiny=TRUE)
+    print('processed netwrite')
     init_net
   }
 })
@@ -439,11 +450,12 @@ node_data2 <- reactive({
 nodelist2 <- reactive({
   if (!is.null(node_data2())) {
     node_data3 <- node_data2()
-    #node_data3[,input$node_id_col] <- as.character(node_data3[,input$node_id_col])
-    #node_measures <- node_measures %>% mutate(id = as.character(id))
+    print(node_data3)
+    node_data3[,input$node_id_col] <- as.character(node_data3[,input$node_id_col])
+    node_measures <- node_measures %>% mutate(id = as.character(id))
     node_measures <- node_measures %>%
       left_join(node_data3)
-    node_measures
+    node_measures %>% mutate(id = as.double(id))
   } else {
     node_measures
   }  
@@ -456,11 +468,15 @@ nodelist3 <- reactive({
   )
   
   net <- net0()
+  
   nodes <- nodelist2()
-  print(nodes)
+  print(nodes$id)
+  print(typeof(nodes$id))
   print('started community detection')
   ideanet::communities(net, shiny  = TRUE)
   print('finished community detection')
+  print(comm_members_net$id)
+  print(typeof(comm_members_net$id))
   comm_members_net <- comm_members_net %>% 
     mutate_all(~replace(., is.na(.), 0))
   #comm_members_net$id <- as.character(comm_members_net$id)
@@ -470,7 +486,7 @@ nodelist3 <- reactive({
     nodes <- nodes %>%
       left_join(cluster_assignments %>% select('best_fit','id'), by = "id")
   }
-  nodes
+  as.data.frame(nodes)
 })
 
 #Add labels in network 1
@@ -927,7 +943,7 @@ output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop =
   ran_toggle_qap <- reactiveValues(x=0)
   
   observeEvent(input$run_QAP_setup, {
-    net <- net0()
+    net <- net5()
     foreach(i=1:length(chosen_var())) %do% {
       net <- set_vertex_attr(net,chosen_var()[i],value=nodelist3() %>% pull(parse_expr(chosen_var()[i])))
     }
@@ -962,8 +978,10 @@ output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop =
   
   observeEvent(input$run_QAP_model, {
     require(exists('qap_results'))
+    print(input$qap_run_choices)
+    print(input$qap_run_dependent)
     qap_run(net = qap_results[[1]], variables = input$qap_run_choices,
-            dependent = qap_run_dependent, directed = T)
+            dependent = input$qap_run_dependent, directed = T)
   })
   
 
