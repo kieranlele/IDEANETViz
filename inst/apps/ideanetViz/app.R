@@ -163,6 +163,10 @@ ui <- shiny::fluidPage(
         uiOutput("palette_choice"),
         uiOutput("uniform_choice"),
         tags$p(HTML("<u>Edge Features</u>")),
+        conditionalPanel(
+          condition = "input.multi_relational_toggle",
+          uiOutput('filter_relation_type')
+        ),
         uiOutput('edge_weight_method'),
         #uiOutput('edge_weight_scalar'),
         uiOutput('interactive')
@@ -333,7 +337,7 @@ server <- function(input, output, session) {
     selectInput(inputId = "node_id_col", label = "Column with node ids*", choices = append("Empty",colnames(node_data())), selected = "id", multiple = FALSE)
   })
   output$node_labels <- renderUI({
-    selectInput(inputId = "node_label_col", label = "Column with node labels", choices = append("Empty",colnames(node_data())), selected = "N/A", multiple = FALSE)
+    selectInput(inputId = "node_label_col", label = "Column with node labels", choices = append("Empty",colnames(node_data())), selected = "Empty", multiple = FALSE)
   })
   output$node_factor <- renderUI({
     selectInput(inputId = "node_factor_col", label = "Column with groups", choices = append("Empty",colnames(node_data())), selected = NULL, multiple = TRUE)
@@ -436,21 +440,11 @@ net0 <- reactive({
 
   
 ### MAKE SURE TO ADD CHECK FOR PROCESSING BACK IN!!!!
-node_data2 <- reactive({
-  if (!(is.null(input$node_id_col))) {
-      node_data2 <- node_data()
-      node_data2$attr <- node_data2[,input$node_id_col]
-      node_data2
-    } else {
-      NULL
-    } 
-  })
 
 # join node data with nodelist  
 nodelist2 <- reactive({
-  if (!is.null(node_data2())) {
-    node_data3 <- node_data2()
-    print(node_data3)
+  if (!is.null(node_data())) {
+    node_data3 <- node_data()
     node_data3[,input$node_id_col] <- as.character(node_data3[,input$node_id_col])
     node_measures <- node_measures %>% mutate(id = as.character(id))
     node_measures <- node_measures %>%
@@ -470,13 +464,9 @@ nodelist3 <- reactive({
   net <- net0()
   
   nodes <- nodelist2()
-  print(nodes$id)
-  print(typeof(nodes$id))
   print('started community detection')
   ideanet::communities(net, shiny  = TRUE)
   print('finished community detection')
-  print(comm_members_net$id)
-  print(typeof(comm_members_net$id))
   comm_members_net <- comm_members_net %>% 
     mutate_all(~replace(., is.na(.), 0))
   #comm_members_net$id <- as.character(comm_members_net$id)
@@ -493,23 +483,20 @@ nodelist3 <- reactive({
 net1 <- reactive({
   net <- net0()
   # Adding Vector Labels
-  if (isTruthy(input$node_label_col)) {
-    if (!(is.null(input$node_label_col))) {
-      V(net)$label <- nodelist3()$id
-    } else {
-      V(net)$label <- nodelist3()[,input$node_label_col]
-    }
+  if (!is.null(input$node_label_col)) {
+    V(net)$label <- nodelist3()[,input$node_label_col]
   } else {
-    V(net)$label <- nodelist3()$attr
+    V(net)$label <- nodelist3()[,'id']
   }
-  #Adding Vector Groups
+  
+  #Add group elements (manually selected, automatically applied)
    if (!is.null(input$node_factor_col)) { 
       if (length(input$node_factor_col) > 2) {
       V(net)$group <- nodelist3() %>% pull(input$node_factor_col[1])
       } else {
        V(net)$group <- nodelist3() %>% pull(input$node_factor_col[1])
       }} else {
-        V(net)$group <- rep("A", length(nodelist3()$attr))
+        V(net)$group <- rep("A", length(nodelist3()$id))
       }
   net
   
@@ -552,7 +539,8 @@ net2 <- reactive({
 })
 
 
-#### Set node colors ----
+
+#### Handle output community detection ----
 output$community_detection <- renderUI({
   if (ran_toggle_qap$x==1) {
     vals <- nodelist3() %>%
@@ -567,13 +555,6 @@ output$community_detection <- renderUI({
   selectInput(inputId = "community_input", label = "Node Coloring", choices = append(append("None", input$node_factor_col),vals[!vals %in% "id"]), selected = "None", multiple = FALSE)
 })
 
-output$palette_choice <- renderUI({
-  selectInput(inputId = "palette_input", label = "Color Palette", choices = c("Uniform", "Rainbow", "Heat", "Terrain", "Topo", "CM"), selected = "Uniform", multiple = FALSE)
-})
-
-output$uniform_choice <- renderUI({
-  textInput(inputId = "uniform_hex_code", label = "Uniform color HEX", value = "#ADD8E6")
-})
 
 #Create network to handle community attributes
 net6 <- reactive({
@@ -587,6 +568,18 @@ net6 <- reactive({
   }
 })
 
+#### Choose colors ----
+output$palette_choice <- renderUI({
+  selectInput(inputId = "palette_input", label = "Color Palette", choices = c("Uniform", "Rainbow", "Heat", "Terrain", "Topo", "CM"), selected = "Uniform", multiple = FALSE)
+})
+
+output$uniform_choice <- renderUI({
+  textInput(inputId = "uniform_hex_code", label = "Uniform color HEX", value = "#ADD8E6")
+})
+
+
+
+#### Set node colors ----
 #Get number of necessary colors based on input
 number_of_color_groups <- reactive({
   if (input$community_input != "None") {
@@ -645,7 +638,68 @@ color_matcher <- reactive({
     data.frame(groups, colrs)
 })
 
-#Set Vertex Color Attribute in network
+#NOTE: actual application to the network condained in edge coloring
+
+#### Set edge colors (type of edge relational) ----
+#Get number of necessary colors based on input
+number_of_color_groups_edges <- reactive({
+  if (input$multi_relational_toggle == TRUE & input$relational_column != "Empty") {
+    length(unique(edge_data()[,input$relational_column]))
+  }
+  else {
+    1
+  }
+})
+
+#Generate Color patterns/hues
+color_generator_edges <- reactive({
+  if (input$palette_input == 'Uniform') {
+    rep(input$uniform_hex_code, number_of_color_groups_edges())
+  } else if (input$palette_input == 'Rainbow') {
+    if (number_of_color_groups_edges() == 1) {
+      rainbow(10)[5]
+    } else {
+      rainbow(number_of_color_groups_edges())
+    }
+  } else if (input$palette_input == 'Heat') {
+    if (number_of_color_groups_edges() == 1) {
+      heat.colors(10)[5]
+    } else {
+      heat.colors(number_of_color_groups_edges())
+    }
+  } else if (input$palette_input == 'Terrain') {
+    if (number_of_color_groups_edges() == 1) {
+      terrain.colors(10)[5]
+    } else {
+      terrain.colors(number_of_color_groups_edges())
+    }
+  } else if (input$palette_input == 'Topo') {
+    if (number_of_color_groups_edges() == 1) {
+      topo.colors(10)[5]
+    } else {
+      topo.colors(number_of_color_groups_edges())
+    }
+  } else if (input$palette_input == 'CM') {
+    if (number_of_color_groups_edges() == 1) {
+      cm.colors(10)[5]
+    } else {
+      cm.colors(number_of_color_groups_edges())
+    }
+  }
+})
+
+#match by color or groups using groups or community
+color_matcher_edges <- reactive({
+  if (input$multi_relational_toggle == TRUE & input$relational_column != "Empty") {
+    groups <- unique(edge_data()[,input$relational_column])
+  } else {
+    groups <- rep(1,length(edge_data()))
+  }
+  colrs <- color_generator_edges()
+  data.frame(groups, colrs)
+})
+
+#Set edge and vertex Color Attribute in network
 net3 <- reactive({
   net <- net6()
   if (input$community_input != "None") {
@@ -653,9 +707,15 @@ net3 <- reactive({
   } else {
     V(net)$color <- color_matcher()$colrs[match(V(net)$group, color_matcher()$groups)]
   }
+  
+  if (input$multi_relational_toggle == TRUE) {
+    if (input$relational_column != "Empty") {
+    E(net)$type <- edge_data()[,input$relational_column]
+    E(net)$color <- color_matcher_edges()$colrs[match(E(net)$type, color_matcher_edges()$groups)]
+    }
+  } 
   net
 })
-
 #### Update Edge weights ----
 #set edge weight
 # output$edge_weight_scalar <- renderUI({
@@ -763,12 +823,28 @@ net5 <- reactive({
   
 ### Visualize network ----
   #output for network vizualizations
-
+  output$filter_relation_type <- renderUI({
+    selectInput('filter_relation_type', label = 'Filter edges by relation', choices = append('None',edge_data()[,input$relational_column]), selected = "None",)
+  })
 
   net8 <-
   reactive({
     net <- net5()
+    
+    if (input$multi_relational_toggle == TRUE) {
+    if (input$filter_relation_type != 'None') {
+      net <- delete.edges(net, E(net)[E(net)$type == input$filter_relation_type])
+    }}
+    
     net.visn <- toVisNetworkData(net)
+    
+    #set node labels manually because for SOME REASON it chooses to misbehave
+    net.visn$nodes$label <- V(net)$label
+    
+    net.visn$nodes$label <- V(net)$label
+    
+    print(net.visn$nodes$label)
+    
     if (input$interactive_switch) {
     if (input$edge_weight_method == "Uniform") {
       net.visn$edges$value <- net.visn$edges$uni_weight
@@ -776,14 +852,18 @@ net5 <- reactive({
       visIgraphLayout(layout = input$layout_choice, randomSeed = seed_number$seed) %>%
         visOptions(highlightNearest = list(enabled = T, hover = T), 
                    nodesIdSelection = T) %>% 
-        visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) 
+        visEdges(arrows =list(to = list(enabled = input$direction_toggle, scaleFactor = 2))) %>% 
+        visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date()))  %>% 
+        visLegend()
     } else {
       net.visn$edges$value <- net.visn$edges$weight
       visNetwork(net.visn$nodes, net.visn$edges) %>% 
         visIgraphLayout(layout = input$layout_choice, randomSeed = seed_number$seed) %>%
         visOptions(highlightNearest = list(enabled = T, hover = T), 
                    nodesIdSelection = T) %>%
-        visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) 
+        visEdges(arrows =list(to = list(enabled = input$direction_toggle, scaleFactor = 2))) %>% 
+        visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) %>% 
+        visLegend()
     }} else {
       if (input$edge_weight_method == "Uniform") {
         net.visn$edges$value <- net.visn$edges$uni_weight
@@ -791,14 +871,18 @@ net5 <- reactive({
           visIgraphLayout(layout = input$layout_choice, randomSeed = seed_number$seed) %>% 
           visInteraction(dragNodes = FALSE, 
                          dragView = FALSE) %>% 
-          visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) 
+          visEdges(arrows =list(to = list(enabled = input$direction_toggle, scaleFactor = 2))) %>% 
+          visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) %>% 
+          visLegend()
       } else {
         net.visn$edges$value <- net.visn$edges$weight
         visNetwork(net.visn$nodes, net.visn$edges) %>% 
           visIgraphLayout(layout = input$layout_choice, randomSeed = seed_number$seed) %>% 
           visInteraction(dragNodes = FALSE, 
                          dragView = FALSE) %>% 
-          visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) 
+          visEdges(arrows =list(to = list(enabled = input$direction_toggle, scaleFactor = 2))) %>% 
+          visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) %>% 
+          visLegend()
     }}
     
   })
