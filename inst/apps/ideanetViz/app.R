@@ -162,7 +162,7 @@ ui <- shiny::fluidPage(
     )),
 ### Network Metrics ----
     tabPanel(
-      "Network Metrics",
+      "Network Statistic Graphs",
       sidebarPanel(
         uiOutput("measure_chooser"),
         conditionalPanel(
@@ -181,7 +181,7 @@ ui <- shiny::fluidPage(
 
 ### Networks DataTable ----
 tabPanel(
-  "Network Table",
+  "Node Measures Table",
   sidebarLayout(
     sidebarPanel(
       style = "height: 90vh; overflow-y: auto;",
@@ -194,7 +194,7 @@ tabPanel(
 ),
 ### Analysis tab ----
     tabPanel(
-      "Analysis",
+      "Advanced Analytical Packages",
       sidebarPanel(
         uiOutput('analysis_chooser'),
         conditionalPanel(
