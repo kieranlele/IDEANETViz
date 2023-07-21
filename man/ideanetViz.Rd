@@ -4,7 +4,7 @@
 \alias{ideanetViz}
 \title{Launch Shiny App}
 \usage{
-ideanet_viz(name = "ideanetViz", ...)
+ideanetViz(name = "ideanetViz", ...)
 }
 \arguments{
 \item{name}{The name of the app to run}
