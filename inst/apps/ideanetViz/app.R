@@ -164,7 +164,15 @@ ui <- shiny::fluidPage(
     tabPanel(
       "Network Metrics",
       sidebarPanel(
-        uiOutput("measure_chooser")
+        uiOutput("measure_chooser"),
+        conditionalPanel(
+          condition = "input.measure_chooser == 'System'",
+          uiOutput('system_level_chooser')
+        ),
+        conditionalPanel(
+          condition = "input.measure_chooser == 'Node'",
+          uiOutput('node_level_chooser')
+        ),
       ),
       mainPanel(
         plotOutput( 'stats1')
@@ -913,6 +921,23 @@ net5 <- reactive({
   })
   
 ### Visualize summary statistics ----
+  
+  output$system_level_chooser <- renderUI({
+    validate (
+    need(input$raw_edges, 'Upload Edge Data!'),
+    need(input$edge_in_col != "Empty", 'Select edge in column!'),
+    need(input$edge_out_col != "Empty", 'Select edge out column!'))
+    selectInput('system_level_chooser', 'Choose which relation you want to visualize', choices = names(system_measure_plot_list), selected = NULL)
+  })
+  
+  output$node_level_chooser <- renderUI({
+    validate (
+      need(input$raw_edges, 'Upload Edge Data!'),
+      need(input$edge_in_col != "Empty", 'Select edge in column!'),
+      need(input$edge_out_col != "Empty", 'Select edge out column!'))
+    selectInput('node_level_chooser', 'Choose which relation you want to visualize', choices = names(node_measure_plot_list), selected = NULL)
+  })
+  
   output$stats1 <- 
     renderPlot({
     validate(
@@ -921,9 +946,9 @@ net5 <- reactive({
       need(input$edge_out_col != "Empty", 'Select edge out column!')
     )
     if (input$measure_chooser == "System") {
-      plot(system_measure_plot)
+      plot(system_measure_plot_list[[match(input$system_level_chooser,names(system_measure_plot_list))]])
     } else {
-      plot(node_measure_plot)
+      plot(node_measure_plot_list[[match(input$node_level_chooser,names(node_measure_plot_list))]])
     }
   })
 
