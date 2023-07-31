@@ -246,7 +246,7 @@ tabPanel(
 #Create server
 server <- function(input, output, session) {
   
-
+library(magrittr)
   
 ### Upload Node  and Edge Data ----
   
@@ -468,7 +468,7 @@ nodelist3 <- reactive({
   #comm_members_net$id <- as.character(comm_members_net$id)
   nodes <- nodes %>%
     dplyr::left_join(comm_members_net, by = "id")
-  if (ran_toggle_qap$x==1) {
+  if (ran_toggle_role_detect$x==1) {
     nodes <- nodes %>%
       dplyr::left_join(cluster_assignments %>% dplyr::select('best_fit','id'), by = "id")
   }
@@ -540,7 +540,7 @@ net2 <- reactive({
 
 #### Handle output community detection ----
 output$community_detection <- renderUI({
-  if (ran_toggle_qap$x==1) {
+  if (ran_toggle_role_detect$x==1) {
     vals <- nodelist3() %>%
       dplyr::select(ends_with('membership'),'best_fit') %>% 
       dplyr::select(-c("strong_membership", "weak_membership")) %>% 
