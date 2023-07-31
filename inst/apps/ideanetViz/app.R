@@ -185,8 +185,11 @@ tabPanel(
   sidebarLayout(
     sidebarPanel(
       style = "height: 90vh; overflow-y: auto;",
+      downloadButton("downloadTable", "Download",icon = shiny::icon("download")),
       uiOutput('show_vars')
+      
       ),
+    
       mainPanel(
         style = "overflow-x: auto;",
         DT::DTOutput('statistics_table'))
@@ -957,7 +960,15 @@ output$show_vars <- renderUI({
   checkboxGroupInput("show_vars", "Columns in node variables to show:",
                      names(node_measures), selected = names(node_measures)[1:5])
 })
-output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop = FALSE])
+  output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop = FALSE])
+  output$downloadTable <- downloadHandler(
+    filename = function() {
+      paste("node_measures_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      write.csv(nodelist3(),file)
+    }
+  )
 ### Setup Analysis Tab ----
   output$analysis_chooser <- renderUI({
     selectInput(inputId = "analysis_chooser", label = "Choose Measures Output", choices = c("QAP", "Role Detection"), selected = "QAP", multiple = FALSE)
