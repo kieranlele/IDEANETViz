@@ -1,21 +1,9 @@
 #Feb 12, 2022
 
 ## Setup libraries and seed ----
-rm(list=ls())
 
 #check if seed file exists,and if it does not, create
-if(!file.exists("seed.txt")) {
-  #read seed file o, create if not written
-  writeLines("999", "seed.txt")
-}
-#remove existing edgelist if rerunning and in environment
-if(exists('network_edgelist')) {
-  rm('network_edgelist')
-}
-#remove existing edgelist if rerunning and in environment
-if(exists('network_nodelist')) {
-  rm('network_nodelist')
-}
+
 
 
 ## Create Fluid Page ----
@@ -186,10 +174,9 @@ tabPanel(
     sidebarPanel(
       style = "height: 90vh; overflow-y: auto;",
       downloadButton("downloadTable", "Download",icon = shiny::icon("download")),
-      uiOutput('show_vars')
-      
+      uiOutput('show_vars'),
+      uiOutput('data_table_vis_var')
       ),
-    
       mainPanel(
         style = "overflow-x: auto;",
         DT::DTOutput('statistics_table'))
@@ -245,7 +232,23 @@ tabPanel(
 
 #Create server
 server <- function(input, output, session) {
+  if(exists('network_edgelist')) {
+    rm(network_edgelist)
+  }
+  #remove existing edgelist if rerunning and in environment
+  if(exists('network_nodelist')) {
+    rm(network_nodelist)
+  }  
+  if(!file.exists("temp/seed.txt")) {
+    #read seed file o, create if not written
+    print('seed not found')
+    writeLines("999", "temp/seed.txt")
+  }
+  #remove existing edgelist if rerunning and in environment
   
+  if(file.exists('inst/apps/ideanetViz/temp/plot_output.png')) {
+    unlink('inst/apps/ideanetViz/temp/plot_output.png')
+  }
 library(magrittr)
   
 ### Upload Node  and Edge Data ----
@@ -319,7 +322,7 @@ library(magrittr)
     # validate(
     #   need(input$raw_nodes, 'Upload Node Data!'),
     # )
-    node_data()
+    network_nodelist
   })
   output$edge_processed <- renderDataTable({
     # validate(
@@ -490,9 +493,9 @@ net1 <- reactive({
   #Add group elements (manually selected, automatically applied)
    if (!is.null(input$node_factor_col)) { 
       if (length(input$node_factor_col) > 2) {
-      igraph::V(net)$group <- nodelist3() %>% pull(input$node_factor_col[1])
+      igraph::V(net)$group <- nodelist3() %>% dplyr::pull(input$node_factor_col[1])
       } else {
-       igraph::V(net)$group <- nodelist3() %>% pull(input$node_factor_col[1])
+       igraph::V(net)$group <- nodelist3() %>% dplyr::pull(input$node_factor_col[1])
       }} else {
         igraph::V(net)$group <- rep("A", length(nodelist3()$id))
       }
@@ -812,11 +815,11 @@ net5 <- reactive({
     })
   
   seed_number <- 
-    reactiveValues(seed =  as.integer(readLines("seed.txt", n = 1)))  
+    reactiveValues(seed =  as.integer(readLines("temp/seed.txt", n = 1)))  
   
   observeEvent(input$set_seed, {
-    writeLines(as.character(sample.int(1000, 1)), "seed.txt")
-    seed_number$seed <-  as.integer(readLines("seed.txt", n = 1))
+    writeLines(as.character(sample.int(1000, 1)), "temp/seed.txt")
+    seed_number$seed <-  as.integer(readLines("temp/seed.txt", n = 1))
     })
   
 ### Visualize network ----
@@ -859,7 +862,8 @@ net5 <- reactive({
         visNetwork::visOptions(highlightNearest = list(enabled = T, hover = T), 
                    nodesIdSelection = T) %>% 
         visNetwork::visEdges(arrows =list(to = list(enabled = input$direction_toggle, scaleFactor = 2))) %>% 
-        visNetwork::visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date()))  %>% 
+        visNetwork::visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date()))  %>%
+        visNetwork::visGroups() %>% 
         visNetwork::visLegend()
     } else {
       net.visn$edges$value <- net.visn$edges$weight
@@ -869,6 +873,7 @@ net5 <- reactive({
                    nodesIdSelection = T) %>%
         visNetwork::visEdges(arrows =list(to = list(enabled = input$direction_toggle, scaleFactor = 2))) %>% 
         visNetwork::visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) %>% 
+        visNetwork::visGroups() %>% 
         visNetwork::visLegend()
     }} else {
       if (input$edge_weight_method == "Uniform") {
@@ -879,6 +884,7 @@ net5 <- reactive({
                          dragView = FALSE) %>% 
           visNetwork::visEdges(arrows =list(to = list(enabled = input$direction_toggle, scaleFactor = 2))) %>% 
           visNetwork::visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) %>% 
+          visNetwork::visGroups() %>% 
           visNetwork::visLegend()
       } else {
         net.visn$edges$value <- net.visn$edges$weight
@@ -888,6 +894,7 @@ net5 <- reactive({
                          dragView = FALSE) %>% 
           visNetwork::visEdges(arrows =list(to = list(enabled = input$direction_toggle, scaleFactor = 2))) %>% 
           visNetwork::visExport(type = input$image_type, name = paste0(input$layout_choice, seed_number$seed,Sys.Date())) %>% 
+          visNetwork::visGroups() %>% 
           visNetwork::visLegend()
     }}
     
@@ -959,6 +966,10 @@ net5 <- reactive({
 output$show_vars <- renderUI({
   checkboxGroupInput("show_vars", "Columns in node variables to show:",
                      names(node_measures), selected = names(node_measures)[1:5])
+})
+  
+output$data_table_vis_var <- renderUI({
+  selectInput('data_table_vis_var',label = 'select vis var',choices = nodelist3() %>% colnames(), selected = NULL)
 })
   output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop = FALSE])
   output$downloadTable <- downloadHandler(
@@ -1060,7 +1071,7 @@ output$show_vars <- renderUI({
   observeEvent(input$run_QAP_setup, {
     net <- net5()
     foreach(i=1:length(chosen_var())) %do% {
-      net <- set_vertex_attr(net,chosen_var()[i],value=nodelist3() %>% pull(parse_expr(chosen_var()[i])))
+      net <- set_vertex_attr(net,chosen_var()[i],value=nodelist3() %>% dplyr::pull(parse_expr(chosen_var()[i])))
     }
     ideanet::qap_setup(net,chosen_var(),chosen_methods())
     ran_toggle_qap$x <- 1
