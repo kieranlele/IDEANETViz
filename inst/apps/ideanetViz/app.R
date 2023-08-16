@@ -232,16 +232,17 @@ tabPanel(
 
 #Create server
 server <- function(input, output, session) {
-  if(exists('network_edgelist')) {
-    rm(network_edgelist)
+  if(exists('edge_data')) {
+    rm(edge_data)
   }
   #remove existing edgelist if rerunning and in environment
-  if(exists('network_nodelist')) {
-    rm(network_nodelist)
+  if(exists('node_data')) {
+    rm(node_data)
   }  
   if(!file.exists("temp/seed.txt")) {
     #read seed file o, create if not written
     print('seed not found')
+    print(getwd())
     writeLines("999", "temp/seed.txt")
   }
   #remove existing edgelist if rerunning and in environment
@@ -266,37 +267,66 @@ library(magrittr)
   
   
   edge_data <- reactive({
-    if (input$nodes_exist & !is.null(input$raw_nodes) & !is.null(input$raw_edges)) {
-    ideanet::netread(
-      path = input$raw_edges$datapath,
-      filetype = input$select_file_type_edges,
-      nodelist = input$raw_nodes$datapath,
-      col_names = input$edge_header,
-      row_names = input$edge_names,
-      format = input$edge_format,
-      net_name = "network",
-      missing_code = 99999
-    )
+    
+    req(input$raw_edges)
+    
+    # Reading CSV
+    if (input$select_file_type_edges == "csv") {
+      # network edgelist
+      read.csv(input$raw_edges$datapath, header = input$edge_header)
+    # Reading Excel
+    } else {
+      if(stringr::str_detect(input$raw_edges$datapath, "xlsx$")) {
+        readxl::read_xlsx(path = input$raw_edges$datapath, col_names = input$edge_header)
+      } else {
+        readxl::read_xls(path = input$raw_edges$datapath, col_names = input$edge_header)
+      } 
     }
-    else if (!is.null(input$raw_edges)) {
-      ideanet::netread(
-        path = input$raw_edges$datapath,
-        filetype = input$select_file_type_edges,
-        format = input$edge_format,
-        col_names = input$edge_header,
-        row_names = input$edge_names,
-        nodelist = NULL,
-        net_name = "network",
-        missing_code = 99999
-      )
-    }
-    as.data.frame(network_edgelist)
+    # if (input$nodes_exist & !is.null(input$raw_nodes) & !is.null(input$raw_edges)) {
+    # ideanet::netread(
+    #   path = input$raw_edges$datapath,
+    #   filetype = input$select_file_type_edges,
+    #   nodelist = input$raw_nodes$datapath,
+    #   col_names = input$edge_header,
+    #   row_names = input$edge_names,
+    #   format = input$edge_format,
+    #   net_name = "network",
+    #   missing_code = 99999
+    # )
+    # }
+    # else if (!is.null(input$raw_edges)) {
+    #   ideanet::netread(
+    #     path = input$raw_edges$datapath,
+    #     filetype = input$select_file_type_edges,
+    #     format = input$edge_format,
+    #     col_names = input$edge_header,
+    #     row_names = input$edge_names,
+    #     nodelist = NULL,
+    #     net_name = "network",
+    #     missing_code = 99999
+    #   )
+    # }
+    # as.data.frame(network_edgelist)
   })
   
   node_data <- reactive({
-    path_edges = input$raw_edges$datapath
-    path_nodes = input$raw_nodes$datapath
-    as.data.frame(network_nodelist)})
+    # path_edges = input$raw_edges$datapath
+    # path_nodes = input$raw_nodes$datapath
+    # as.data.frame(network_nodelist)
+    req(input$raw_nodes)
+    # Reading CSV
+    if (input$select_file_type_edges == "csv") {
+      # network edgelist
+      read.csv(input$raw_nodes$datapath, header = input$edge_header)
+      # Reading Excel
+    } else {
+      if(stringr::str_detect(input$raw_nodes$datapath, "xlsx$")) {
+        readxl::read_xlsx(path = input$raw_nodes$datapath, col_names = input$edge_header)
+      } else {
+        readxl::read_xls(path = input$raw_nodes$datapath, col_names = input$edge_header)
+      } 
+    }
+    })
   
   #Display Node Data
   output$node_raw_upload <- renderDataTable({
@@ -322,7 +352,7 @@ library(magrittr)
     # validate(
     #   need(input$raw_nodes, 'Upload Node Data!'),
     # )
-    network_nodelist
+    node_data()
   })
   output$edge_processed <- renderDataTable({
     # validate(
