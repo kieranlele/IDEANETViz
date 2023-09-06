@@ -154,11 +154,11 @@ ui <- shiny::fluidPage(
       sidebarPanel(
         uiOutput("measure_chooser"),
         conditionalPanel(
-          condition = "input.measure_chooser == 'System'",
+          condition = "input.measure_chooser == 'System' & input$multi_relational_toggle == TRUE",
           uiOutput('system_level_chooser')
         ),
         conditionalPanel(
-          condition = "input.measure_chooser == 'Node'",
+          condition = "input.measure_chooser == 'Node' & input$multi_relational_toggle == TRUE",
           uiOutput('node_level_chooser')
         ),
       ),
@@ -173,9 +173,9 @@ tabPanel(
   sidebarLayout(
     sidebarPanel(
       style = "height: 90vh; overflow-y: auto;",
-      downloadButton("downloadTable", "Download",icon = shiny::icon("download")),
       uiOutput('show_vars'),
-      uiOutput('data_table_vis_var')
+      uiOutput('data_table_vis_var'),
+      downloadButton("downloadTable", "Download",icon = shiny::icon("download"))
       ),
       mainPanel(
         style = "overflow-x: auto;",
@@ -587,7 +587,7 @@ output$community_detection <- renderUI({
 })
 
 
-#Create network to handle community attributes
+# Create network to handle community attributes
 net6 <- reactive({
   net <- net2()
   if (!(input$community_input == "None")) {
@@ -967,15 +967,19 @@ net5 <- reactive({
     need(input$raw_edges, 'Upload Edge Data!'),
     need(input$edge_in_col != "Empty", 'Select edge in column!'),
     need(input$edge_out_col != "Empty", 'Select edge out column!'))
-    selectInput('system_level_chooser', 'Choose which relation you want to visualize', choices = names(system_measure_plot_list), selected = NULL)
-  })
+    if (input$multi_relational_toggle == TRUE) {
+          selectInput('system_level_chooser', 'Choose which relation you want to visualize', choices = names(system_measure_plot_list), selected = NULL)
+    }  
+      })
   
   output$node_level_chooser <- renderUI({
     validate (
       need(input$raw_edges, 'Upload Edge Data!'),
       need(input$edge_in_col != "Empty", 'Select edge in column!'),
       need(input$edge_out_col != "Empty", 'Select edge out column!'))
-    selectInput('node_level_chooser', 'Choose which relation you want to visualize', choices = names(node_measure_plot_list), selected = NULL)
+    if (input$multi_relational_toggle == TRUE) {
+          selectInput('node_level_chooser', 'Choose which relation you want to visualize', choices = names(node_measure_plot_list), selected = NULL)
+    }
   })
   
   output$stats1 <- 
@@ -985,11 +989,23 @@ net5 <- reactive({
       need(input$edge_in_col != "Empty", 'Select edge in column!'),
       need(input$edge_out_col != "Empty", 'Select edge out column!')
     )
-    if (input$measure_chooser == "System") {
-      plot(system_measure_plot_list[[match(input$system_level_chooser,names(system_measure_plot_list))]])
+    
+    # Multirelational  
+    if(input$multi_relational_toggle == TRUE) {
+        if (input$measure_chooser == "System") {
+          plot(system_measure_plot_list[[match(input$system_level_chooser,names(system_measure_plot_list))]])
+        } else {
+          plot(node_measure_plot_list[[match(input$node_level_chooser,names(node_measure_plot_list))]])
+        }
+    # Single Relation
     } else {
-      plot(node_measure_plot_list[[match(input$node_level_chooser,names(node_measure_plot_list))]])
+      if (input$measure_chooser == "System") {
+        plot(system_measure_plot)
+      } else {
+        plot(node_measure_plot)
+      }
     }
+      
   })
 
 ### Visualize nodemeasures ----
@@ -998,10 +1014,11 @@ output$show_vars <- renderUI({
                      names(node_measures), selected = names(node_measures)[1:5])
 })
   
-output$data_table_vis_var <- renderUI({
+output$data_table_vis_var <- renderUI({print("Reached vis var")
   selectInput('data_table_vis_var',label = 'select vis var',choices = nodelist3() %>% colnames(), selected = NULL)
 })
-  output$statistics_table <- renderDataTable(nodelist3()[, input$show_vars, drop = FALSE])
+  output$statistics_table <- DT::renderDataTable({#print("Reached data table")
+                                              nodelist3()[, input$show_vars, drop = FALSE]})
   output$downloadTable <- downloadHandler(
     filename = function() {
       paste("node_measures_", Sys.Date(), ".csv")
@@ -1171,7 +1188,7 @@ output$data_table_vis_var <- renderUI({
     choices_yah <- c()
     if (input$select_role_type == 'cluster') {
       choices_yah <- c('cluster_modularity',
-                       'cluster_dendogram',
+                       'cluster_dendrogram',
                        'cluster_relations_heatmaps_chisq',
                        'cluster_relations_heatmaps_density_centered',
                        'cluster_relations_heatmaps_density_std',
