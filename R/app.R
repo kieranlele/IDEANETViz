@@ -8,5 +8,7 @@
 ideanetViz <- function(name = "ideanetViz", ...) {
   appDir <- system.file(paste0("apps/", name), package = "ideanetViz")
   if (appDir == "") stop("The shiny app ", name, " does not exist")
-  shiny::runApp(appDir, display.mode = 'showcase', ...)
+  shiny::runApp(appDir, 
+                #display.mode = 'showcase', 
+                ...)
 }
